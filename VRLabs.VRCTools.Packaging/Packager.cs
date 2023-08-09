@@ -43,6 +43,11 @@ public static class Packager
                     File.Delete(outputFilePath);
                 ZipFile.CreateFromDirectory(tempPath, outputFilePath);
                 Log.Information("Finished Zipping, available at {OutputFilePath}", outputFilePath);
+                if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
+                   Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
+                {
+                    Log.Information("::set-output name=vccPackagePath::{OutputFilePath}", outputFilePath);
+                }
 
                 using var sha256 = SHA256.Create();
                 await using (var stream = File.OpenRead(outputFilePath))
@@ -90,13 +95,25 @@ public static class Packager
             // Finally flush and tell them we done
             await packer.FlushAsync();
             Log.Information("Finished Packaging, available at {OutputFilePath}", outputFilePath);
+            if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
+               Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
+            {
+                Log.Information("::set-output name=unityPackagePath::{OutputFilePath}", outputFilePath);
+            }
             DeleteDirectory(tempPath);
         }
         if(sha256String is not null)
             data.ZipSHA256 = sha256String;
         
-        await File.WriteAllTextAsync($"{outputDirectory}/server-package.json", JsonSerializer.Serialize(data));
-        Log.Information("Finished creating server-package.json, available at {OutputFilePath}", $"{outputDirectory}/server-package.json");
+        var serverPackageJsonPath = $"{workingDirectory}/server-package.json"; 
+        
+        await File.WriteAllTextAsync(serverPackageJsonPath, JsonSerializer.Serialize(data));
+        Log.Information("Finished creating server-package.json, available at {OutputFilePath}", serverPackageJsonPath);
+        if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
+           Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
+        {
+            Log.Information("::set-output name=serverPackageJsonPath::{OutputFilePath}", serverPackageJsonPath);
+        }
         
         return true;
     }

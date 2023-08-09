@@ -1,0 +1,29 @@
+﻿name: Apply Tag
+
+on:
+  push:
+    branches:
+      - 'release/*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set project version
+        run: |
+          version=$(echo "${{ github.ref }}" | sed 's/refs\/heads\/release\///')
+          sed -i "s/<Version>.*<\/Version>/<Version>$version<\/Version>/" VRLabs.VRCTools.Packaging/VRLabs.VRCTools.Packaging.csproj
+          sed -i "s/<Version>.*<\/Version>/<Version>$version<\/Version>/" VRLabs.VRCTools.Packaging.Console/VRLabs.VRCTools.Packaging.Console.csproj
+
+      - name: Commit version change
+        run: |
+          git add .
+          git commit -m "Bump version to $version"
+
+      - name: Apply tag to commit
+        run: |
+          git tag -a $version -m "Version $version"
+          git push --tags
