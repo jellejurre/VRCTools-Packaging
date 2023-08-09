@@ -44,11 +44,9 @@ jobs:
           git push origin ${{ github.ref }}
           git push origin --tags
           
-      - name: Set version from branch name
-        id: set_version
+      - name: Modify refs with version
         run: |
-          version=$(echo "${{ github.ref }}" | sed 's/refs\/heads\/release\///')
-          echo "github.ref=${{ steps.set_version.outputs.version }}" >> $GITHUB_OUTPUT
+          echo "github.ref=refs\/tags\/${{ steps.set_version.outputs.version }}" >> $GITHUB_OUTPUT
           
       - name: Log in to the Container registry
         uses: docker/login-action@v4
