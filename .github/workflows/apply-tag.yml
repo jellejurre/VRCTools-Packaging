@@ -36,5 +36,10 @@ jobs:
 
       - name: Apply tag to commit
         run: |
-          git tag -a ${{ steps.vars.set_version.version }} -m "Version ${{ steps.vars.set_version.version }}"
+          git tag -a ${{ steps.set_version.outputs.version }} -m "Version ${{ steps.vars.set_version.version }}"
           git push --tags
+          
+      - name: Push changes and tag to remote repository
+        run: |
+          git push origin ${{ github.ref }}
+          git push origin --tags
