@@ -42,7 +42,6 @@ jobs:
       - name: Apply tag to commit
         run: |
           git tag -a ${{ steps.set_version.outputs.version }} -m "Version ${{ steps.vars.set_version.version }}"
-          git push --tags
 
       - name: Push changes and tag to remote repository
         run: |
@@ -67,7 +66,8 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.set_version.outputs.version }}
+          tags: | 
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.set_version.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
       - name: Create Release
