@@ -12,10 +12,18 @@ public static class Packager
 {
     public static async Task<bool> CreatePackage(string workingDirectory, string outputDirectory, string? releaseUrl = null, bool skipVcc = false, bool skipUnityPackage = false)
     {
-        if(skipVcc && skipUnityPackage) return false;
+
+        if (skipVcc && skipUnityPackage)
+        {
+            Log.Information("Both skipVcc and skipUnityPackage are true, nothing to do");
+            return true;
+        }
         var data = GetPackageJson(workingDirectory);
-        if (data == null) return false;
-        Console.WriteLine("BB");
+        if (data == null)
+        {
+            Log.Error("Could not find package.json in {WorkingDirectory}", workingDirectory);
+            return false;
+        }
         string tempPath = Path.GetTempPath();
         tempPath += "/VRLabs/Packaging";
         if(Directory.Exists(tempPath)) DeleteDirectory(tempPath);
