@@ -21,7 +21,7 @@ jobs:
         id: set_version
         run: |
           version=$(echo "${{ github.ref }}" | sed 's/refs\/heads\/release\///')
-          version=(echo $version | tr '[:upper:]' '[:lower:]')
+          version=$(echo $version | tr '[:upper:]' '[:lower:]')
           echo "version=$version" >> $GITHUB_OUTPUT
           lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           echo "image_name=$lowercase" >> $GITHUB_OUTPUT
@@ -68,6 +68,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
+          file: ./VRLabs.VRCTools.Packaging.Console/Dockerfile
           push: true
           tags: | 
             ${{ env.REGISTRY }}/${{ steps.set_version.outputs.image_name }}:${{ steps.set_version.outputs.version }}
