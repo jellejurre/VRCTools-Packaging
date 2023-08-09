@@ -12,10 +12,18 @@ public static class Packager
 {
     public static async Task<bool> CreatePackage(string workingDirectory, string outputDirectory, string? releaseUrl = null, bool skipVcc = false, bool skipUnityPackage = false)
     {
-        if(skipVcc && skipUnityPackage) return false;
+
+        if (skipVcc && skipUnityPackage)
+        {
+            Log.Information("Both skipVcc and skipUnityPackage are true, nothing to do");
+            return true;
+        }
         var data = GetPackageJson(workingDirectory);
-        if (data == null) return false;
-        Console.WriteLine("BB");
+        if (data == null)
+        {
+            Log.Error("Could not find package.json in {WorkingDirectory}", workingDirectory);
+            return false;
+        }
         string tempPath = Path.GetTempPath();
         tempPath += "/VRLabs/Packaging";
         if(Directory.Exists(tempPath)) DeleteDirectory(tempPath);
@@ -43,6 +51,11 @@ public static class Packager
                     File.Delete(outputFilePath);
                 ZipFile.CreateFromDirectory(tempPath, outputFilePath);
                 Log.Information("Finished Zipping, available at {OutputFilePath}", outputFilePath);
+                if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
+                   Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
+                {
+                    Log.Information("::set-output name=vccPackagePath::{OutputFilePath}", outputFilePath);
+                }
 
                 using var sha256 = SHA256.Create();
                 await using (var stream = File.OpenRead(outputFilePath))
@@ -90,13 +103,25 @@ public static class Packager
             // Finally flush and tell them we done
             await packer.FlushAsync();
             Log.Information("Finished Packaging, available at {OutputFilePath}", outputFilePath);
+            if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
+               Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
+            {
+                Log.Information("::set-output name=unityPackagePath::{OutputFilePath}", outputFilePath);
+            }
             DeleteDirectory(tempPath);
         }
         if(sha256String is not null)
             data.ZipSHA256 = sha256String;
         
-        await File.WriteAllTextAsync($"{outputDirectory}/server-package.json", JsonSerializer.Serialize(data));
-        Log.Information("Finished creating server-package.json, available at {OutputFilePath}", $"{outputDirectory}/server-package.json");
+        var serverPackageJsonPath = $"{workingDirectory}/server-package.json"; 
+        
+        await File.WriteAllTextAsync(serverPackageJsonPath, JsonSerializer.Serialize(data));
+        Log.Information("Finished creating server-package.json, available at {OutputFilePath}", serverPackageJsonPath);
+        if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
+           Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
+        {
+            Log.Information("::set-output name=serverPackageJsonPath::{OutputFilePath}", serverPackageJsonPath);
+        }
         
         return true;
     }
