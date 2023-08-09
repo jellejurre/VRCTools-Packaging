@@ -12,11 +12,17 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Set project version
+      - name: Set version from branch name
+        id: set_version
         run: |
           version=$(echo "${{ github.ref }}" | sed 's/refs\/heads\/release\///')
-          sed -i "s/<Version>.*<\/Version>/<Version>$version<\/Version>/" VRLabs.VRCTools.Packaging/VRLabs.VRCTools.Packaging.csproj
-          sed -i "s/<Version>.*<\/Version>/<Version>$version<\/Version>/" VRLabs.VRCTools.Packaging.Console/VRLabs.VRCTools.Packaging.Console.csproj
+          echo "version=$version" >> $GITHUB_OUTPUT
+            - name: Set project version
+          
+      - name: Set project version
+        run: |
+          sed -i "s/<Version>.*<\/Version>/<Version>${{ steps.vars.set_version.version }}<\/Version>/" VRLabs.VRCTools.Packaging/VRLabs.VRCTools.Packaging.csproj
+          sed -i "s/<Version>.*<\/Version>/<Version>${{ steps.vars.set_version.version }}<\/Version>/" VRLabs.VRCTools.Packaging.Console/VRLabs.VRCTools.Packaging.Console.csproj
 
       - name: Configure git
         run: |
@@ -27,9 +33,9 @@ jobs:
       - name: Commit version change
         run: |
           git add .
-          git commit -m "Bump version to $version"
+          git commit -m "Bump version to ${{ steps.vars.set_version.version }}"
 
       - name: Apply tag to commit
         run: |
-          git tag -a $version -m "Version $version"
+          git tag -a ${{ steps.vars.set_version.version }} -m "Version ${{ steps.vars.set_version.version }}"
           git push --tags
