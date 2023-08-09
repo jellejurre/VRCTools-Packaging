@@ -20,8 +20,8 @@ jobs:
           
       - name: Set project version
         run: |
-          sed -i "s/<Version>.*<\/Version>/<Version>${{ steps.vars.set_version.version }}<\/Version>/" VRLabs.VRCTools.Packaging/VRLabs.VRCTools.Packaging.csproj
-          sed -i "s/<Version>.*<\/Version>/<Version>${{ steps.vars.set_version.version }}<\/Version>/" VRLabs.VRCTools.Packaging.Console/VRLabs.VRCTools.Packaging.Console.csproj
+          sed -i "s/<Version>.*<\/Version>/<Version>${{ steps.set_version.outputs.version }}<\/Version>/" VRLabs.VRCTools.Packaging/VRLabs.VRCTools.Packaging.csproj
+          sed -i "s/<Version>.*<\/Version>/<Version>${{ steps.set_version.outputs.version }}<\/Version>/" VRLabs.VRCTools.Packaging.Console/VRLabs.VRCTools.Packaging.Console.csproj
 
       - name: Configure git
         run: |
@@ -32,7 +32,7 @@ jobs:
       - name: Commit version change
         run: |
           git add .
-          git commit -m "Bump version to ${{ steps.vars.set_version.version }}"
+          git commit -m "Bump version to ${{ steps.set_version.outputs.version }}"
 
       - name: Apply tag to commit
         run: |
