@@ -18,6 +18,11 @@ jobs:
           sed -i "s/<Version>.*<\/Version>/<Version>$version<\/Version>/" VRLabs.VRCTools.Packaging/VRLabs.VRCTools.Packaging.csproj
           sed -i "s/<Version>.*<\/Version>/<Version>$version<\/Version>/" VRLabs.VRCTools.Packaging.Console/VRLabs.VRCTools.Packaging.Console.csproj
 
+      - name: Configure git
+        uses: oleksiyrudenko/gha-git-credentials@v2-latest
+        with:
+          token: '${{ secrets.GITHUB_TOKEN }}'
+
       - name: Commit version change
         run: |
           git add .
