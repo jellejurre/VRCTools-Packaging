@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VRLabs.VRCTools.Packaging", "VRLabs.VRCTools.Packaging\VRLabs.VRCTools.Packaging.csproj", "{94FAC700-D2B6-480A-A841-40151976AD19}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VRLabs.VRCTools.Packaging.Console", "VRLabs.VRCTools.Packaging.Console\VRLabs.VRCTools.Packaging.Console.csproj", "{11C07F0A-8831-472D-8038-634718FB26BE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{94FAC700-D2B6-480A-A841-40151976AD19}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{94FAC700-D2B6-480A-A841-40151976AD19}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{94FAC700-D2B6-480A-A841-40151976AD19}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{94FAC700-D2B6-480A-A841-40151976AD19}.Release|Any CPU.Build.0 = Release|Any CPU
+		{11C07F0A-8831-472D-8038-634718FB26BE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{11C07F0A-8831-472D-8038-634718FB26BE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{11C07F0A-8831-472D-8038-634718FB26BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{11C07F0A-8831-472D-8038-634718FB26BE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
