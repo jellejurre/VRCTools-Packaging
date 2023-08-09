@@ -21,7 +21,14 @@ jobs:
         id: set_version
         run: |
           version=$(echo "${{ github.ref }}" | sed 's/refs\/heads\/release\///')
+          version=$(echo $version | tr '[:upper:]' '[:lower:]')
           echo "version=$version" >> $GITHUB_OUTPUT
+          major_version=$(echo $version | cut -d '.' -f 1)
+          minor_version=$(echo $version | cut -d '.' -f 2)
+          echo "major_version=$major_version" >> $GITHUB_OUTPUT
+          echo "minor_version=$minor_version" >> $GITHUB_OUTPUT
+          lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "image_name=$lowercase" >> $GITHUB_OUTPUT
 
       - name: Set project version
         run: |
@@ -41,7 +48,7 @@ jobs:
 
       - name: Apply tag to commit
         run: |
-          git tag -a ${{ steps.set_version.outputs.version }} -m "Version ${{ steps.vars.set_version.version }}"
+          git tag -a ${{ steps.set_version.outputs.version }} -m "Version ${{ steps.set_version.outputs.version }}"
 
       - name: Push changes and tag to remote repository
         run: |
@@ -65,18 +72,21 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
+          file: ./VRLabs.VRCTools.Packaging.Console/Dockerfile
           push: true
           tags: | 
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.set_version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ steps.set_version.outputs.image_name }}:${{ steps.set_version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ steps.set_version.outputs.image_name }}:${{ steps.set_version.outputs.major_version }}.${{ steps.set_version.outputs.minor_version }}
+            ${{ env.REGISTRY }}/${{ steps.set_version.outputs.image_name }}:${{ steps.set_version.outputs.major_version }}
+            ${{ env.REGISTRY }}/${{ steps.set_version.outputs.image_name }}:latest
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.set_version.outputs.version }}
-          release_name: Release ${{ steps.set_version.outputs.version }}
-          draft: false
-          prerelease: false
+      #- name: Create Release
+      #  id: create_release
+      #  uses: actions/create-release@v1
+      #  env:
+      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #  with:
+      #    tag_name: ${{ steps.set_version.outputs.version }}
+      #    release_name: Release ${{ steps.set_version.outputs.version }}
+      #    draft: false
+      #    prerelease: false
