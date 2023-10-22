@@ -32,7 +32,7 @@ public static class Packager
         data["zipSHA256"] = null;
 
         string packageName = data["name"]!.ToString();
-        string packageVersion = data["name"]!.ToString();
+        string packageVersion = data["version"]!.ToString();
 
         if (!skipVcc)
         {
