@@ -13,7 +13,81 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '7.x.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build application
+        run: dotnet build --configuration Release
+
+      - name: Test application
+        run: dotnet test
+
+  matrix-build:
+    needs: build
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            RUNTIME: linux-x64
+          - os: windows-latest
+            RUNTIME: win-x64
+          - os: macos-latest
+            RUNTIME: osx-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set version from branch name
+        id: set_version
+        shell: bash
+        run: |
+          version=$(echo "${{ github.ref_name }}")
+          version=$(echo $version | tr '[:upper:]' '[:lower:]')
+          echo "version=$version" >> $GITHUB_OUTPUT
+          major_version=$(echo $version | cut -d '.' -f 1)
+          minor_version=$(echo $version | cut -d '.' -f 2)
+          echo "major_version=$major_version" >> $GITHUB_OUTPUT
+          echo "minor_version=$minor_version" >> $GITHUB_OUTPUT
+          lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "image_name=$lowercase" >> $GITHUB_OUTPUT
+
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '7.x.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build application
+        run: dotnet publish VRLabs.VRCTools.Packaging.Console --configuration Release --output bin/Release/publish --runtime ${{ matrix.RUNTIME }} --self-contained false  /p:PublishSingleFile=true  /p:IncludeNativeLibrariesForSelfExtract=true /p:DebugType=Embedded /p:Version=${{ steps.set_version.outputs.version }}
+
+      - name: Rename executable
+        shell: bash
+        run: |
+          mv bin/Release/publish/VRLabs.VRCTools.Packaging.Console bin/Release/publish/VRCPackagingTool${1##*.}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: VRCPackagingTool-${{ matrix.RUNTIME }}
+          path: bin/Release/publish/
+          retention-days: 1
+
+  docker-build:
+    needs: build
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
 
@@ -50,19 +124,54 @@ jobs:
           context: .
           file: ./VRLabs.VRCTools.Packaging.Console/Dockerfile
           push: true
-          tags: | 
+          tags: |
             ${{ env.REGISTRY }}/${{ steps.set_version.outputs.image_name }}:${{ steps.set_version.outputs.version }}
             ${{ env.REGISTRY }}/${{ steps.set_version.outputs.image_name }}:${{ steps.set_version.outputs.major_version }}.${{ steps.set_version.outputs.minor_version }}
             ${{ env.REGISTRY }}/${{ steps.set_version.outputs.image_name }}:${{ steps.set_version.outputs.major_version }}
             ${{ env.REGISTRY }}/${{ steps.set_version.outputs.image_name }}:latest
 
-      #- name: Create Release
-      #  id: create_release
-      #  uses: actions/create-release@v1
-      #  env:
-      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #  with:
-      #    tag_name: ${{ steps.set_version.outputs.version }}
-      #    release_name: Release ${{ steps.set_version.outputs.version }}
-      #    draft: false
-      #    prerelease: false
+  release:
+    needs: [matrix-build, docker-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set version from branch name
+        id: set_version
+        run: |
+          version=$(echo "${{ github.ref_name }}")
+          version=$(echo $version | tr '[:upper:]' '[:lower:]')
+          echo "version=$version" >> $GITHUB_OUTPUT
+          major_version=$(echo $version | cut -d '.' -f 1)
+          minor_version=$(echo $version | cut -d '.' -f 2)
+          echo "major_version=$major_version" >> $GITHUB_OUTPUT
+          echo "minor_version=$minor_version" >> $GITHUB_OUTPUT
+          lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "image_name=$lowercase" >> $GITHUB_OUTPUT
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: bin/Release/publish
+
+      - name: Zip each artifact
+        run: |
+          cd bin/Release/publish/VRCPackagingTool-linux-x64
+          zip -r ../VRCPackagingTool-linux-x64.zip .
+          cd ../VRCPackagingTool-win-x64
+          zip -r ../VRCPackagingTool-win-x64.zip .
+          cd ../VRCPackagingTool-osx-x64
+          zip -r ../VRCPackagingTool-osx-x64.zip .
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_TAG: ${{ steps.set_version.outputs.version }}
+        with:
+          name: Release ${{ steps.set_version.outputs.version }}
+          files: |
+            bin/Release/publish/VRCPackagingTool-linux-x64.zip
+            bin/Release/publish/VRCPackagingTool-win-x64.zip
+            bin/Release/publish/VRCPackagingTool-osx-x64.zip
