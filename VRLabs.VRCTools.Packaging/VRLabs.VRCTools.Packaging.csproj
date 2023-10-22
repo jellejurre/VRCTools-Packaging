@@ -5,6 +5,10 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <Version>1.0.999</Version>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <Company>VRLabs</Company>
+        <Authors>VRLabs</Authors>
+        <Description>Library that provides a way to package assets into UnityPackage and VRChat's vcc package formats</Description>
     </PropertyGroup>
 
     <ItemGroup>
