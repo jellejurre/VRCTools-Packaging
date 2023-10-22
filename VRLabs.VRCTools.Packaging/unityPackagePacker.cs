@@ -72,7 +72,7 @@ public class unityPackagePacker : IDisposable, IAsyncDisposable
         if (!File.Exists(metaFile))
         {
             //Meta file is missing so we will skip it.
-            Log.Warning("Missing .meta for {Path} , skipping", relativePath);
+            Log.Warning("Missing .meta for {Path}, skipping", relativePath);
             return false;
         }
 

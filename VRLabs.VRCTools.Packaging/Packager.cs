@@ -1,8 +1,8 @@
-﻿using System.IO.Compression;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using ICSharpCode.SharpZipLib.Zip;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Serilog;
 
@@ -50,7 +50,15 @@ public static class Packager
                 Log.Information("Zipping {WorkingDirectory}", tempPath);
                 if(File.Exists(outputFilePath))
                     File.Delete(outputFilePath);
-                ZipFile.CreateFromDirectory(tempPath, outputFilePath);
+                
+                var assetMatcher = new Matcher();
+                AddExporterPatterns(assetMatcher);
+                
+                string[] matchedAssets = assetMatcher.GetResultsInFullPath(tempPath).ToArray();
+                
+                CreateZipFile(tempPath, outputFilePath, matchedAssets.ToList());
+                
+                //ZipFile.CreateFromDirectory(tempPath, outputFilePath);
                 Log.Information("Finished Zipping, available at {OutputFilePath}", outputFilePath);
                 if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
                    Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
@@ -101,8 +109,7 @@ public static class Packager
 
             // Match all the assets we need
             var assetMatcher = new Matcher();
-            assetMatcher.AddIncludePatterns(new[] { "**.*" });
-            assetMatcher.AddExcludePatterns(new[] { "Library/**.*", "**/.*" });
+            AddExporterPatterns(assetMatcher);
             assetMatcher.AddExclude(outputFileName);
 
             IEnumerable<string> matchedAssets = assetMatcher.GetResultsInFullPath(tempPath);
@@ -151,7 +158,13 @@ public static class Packager
         
         return true;
     }
-    
+
+    private static void AddExporterPatterns(Matcher assetMatcher)
+    {
+        assetMatcher.AddIncludePatterns(new[] { "**.*" });
+        assetMatcher.AddExcludePatterns(new[] { "**/.*" });
+    }
+
     private static JsonObject? GetPackageJson(string workingDirectory)
     {
         string packagePath = workingDirectory + "/package.json";
@@ -224,8 +237,8 @@ public static class Packager
             CopyDirectory(subDir.FullName, newDestinationDir, true, ignoreDotPaths);
         }
     }
-    
-    public static void DeleteDirectory(string targetDir)
+
+    private static void DeleteDirectory(string targetDir)
     {
         File.SetAttributes(targetDir, FileAttributes.Normal);
 
@@ -244,5 +257,69 @@ public static class Packager
         }
         
         Directory.Delete(targetDir, false);
+    }
+
+    private static void CreateZipFile(string entryDirectoryPath, string outputPath, List<string> filePaths)
+    {
+        using var zipStream = new ZipOutputStream(File.Create(outputPath));
+        zipStream.SetLevel(9); // Set the compression level (0-9)
+
+        byte[] buffer = new byte[4096];
+
+        foreach (string filePath in filePaths)
+        {
+            var file = new FileInfo(filePath);
+            if (!file.Exists) continue;
+
+            string relativePath = Path.GetRelativePath(entryDirectoryPath, filePath);
+            
+            if (file.Extension == ".meta")
+            {
+                if (File.Exists(file.FullName[..^5]))
+                {
+                    Log.Information("Writing meta {Path}", relativePath);
+                    WriteFile(relativePath, filePath, zipStream, buffer);
+                    continue;
+                }
+                if(Directory.Exists(file.FullName[..^5]))
+                {
+                    Log.Information("Writing meta {Path}", relativePath);
+                    WriteFile(relativePath, filePath, zipStream, buffer);
+                    continue;
+                }
+                
+                Log.Warning("{Path} refers to a non existing file/folder, skipping", relativePath);
+                continue;
+            }
+            
+            string metaFile = $"{file.FullName}.meta";
+            if (!File.Exists(metaFile))
+            {
+                //Meta file is missing so we will skip it.
+                Log.Warning("Missing .meta for {Path}, skipping", relativePath);
+                continue;
+            }
+            
+            Log.Information("Writing File {Path}", relativePath);
+            WriteFile(relativePath, filePath, zipStream, buffer);
+        }
+
+        zipStream.Finish();
+        zipStream.Close();
+    }
+
+    private static void WriteFile(string relativePath, string filePath, ZipOutputStream zipStream, byte[] buffer)
+    {
+        var entry = new ZipEntry(relativePath);
+        entry.DateTime = DateTime.Now;
+        zipStream.PutNextEntry(entry);
+
+        using FileStream fileStream = File.OpenRead(filePath);
+        int bytesRead;
+        do
+        {
+            bytesRead = fileStream.Read(buffer, 0, buffer.Length);
+            zipStream.Write(buffer, 0, bytesRead);
+        } while (bytesRead > 0);
     }
 }
