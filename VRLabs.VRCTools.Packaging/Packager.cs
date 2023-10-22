@@ -146,7 +146,7 @@ public static class Packager
         if(sha256String is not null)
             data["zipSHA256"] = sha256String;
         
-        var serverPackageJsonPath = $"{workingDirectory}/server-package.json"; 
+        var serverPackageJsonPath = $"{outputDirectory}/server-package.json"; 
         
         await File.WriteAllTextAsync(serverPackageJsonPath, JsonSerializer.Serialize(data));
         Log.Information("Finished creating server-package.json, available at {OutputFilePath}", serverPackageJsonPath);
