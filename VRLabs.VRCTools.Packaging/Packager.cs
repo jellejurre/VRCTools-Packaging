@@ -10,7 +10,7 @@ namespace VRLabs.VRCTools.Packaging;
 
 public static class Packager
 {
-    public static async Task<bool> CreatePackage(string workingDirectory, string outputDirectory, string? releaseUrl = null, string? unityPackageUrl = null, bool skipVcc = false, bool skipUnityPackage = false)
+    public static async Task<bool> CreatePackage(string workingDirectory, string outputDirectory, string? releaseUrl = null, string? unityPackageUrl = null, string? version = null, bool skipVcc = false, bool skipUnityPackage = false)
     {
         if (skipVcc && skipUnityPackage)
         {
@@ -32,7 +32,11 @@ public static class Packager
         data["zipSHA256"] = null;
 
         string packageName = data["name"]!.ToString();
+        
+        if(!string.IsNullOrEmpty(version))
+            data["version"] = version;
         string packageVersion = data["version"]!.ToString();
+        
 
         if (!skipVcc)
         {

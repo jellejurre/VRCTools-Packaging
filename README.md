@@ -34,15 +34,15 @@ Only generating the `vcc` package:
 VRCPackagingTool.exe "packageAssetsPath" "outputDirectorypath" --releaseUrl "vccReleaseUrl" --nounity  
 ```
 
-You can use the `--help` flag to get a list of all the available options.
+You can use the `--help` or `-h` flag to get a list of all the available options.
 
 ```
 VRCPackagingTool.exe --help       
-Description:
+Description:                                                                                                
   Packs the assets inside a folder in a Unity Project based on an info file
 
 Usage:
-  VRCPackagingTool <path> <output> [options]
+  VRLabs.VRCTools.Packaging.Console <path> <output> [options]
 
 Arguments:
   <path>    Unity asset path
@@ -51,11 +51,13 @@ Arguments:
 Options:
   --releaseUrl <releaseUrl>            Url of the release []
   --unityReleaseUrl <unityReleaseUrl>  Url of the release of the unitypackage []
+  --releaseVersion <releaseVersion>    Version to use for the release, if not specified it will be taken from the package.json []
   --novcc                              don't build the vcc zip file [default: False]
   --nounity                            don't build the unitypackage [default: False]
   --action                             is it running on github actions? [default: False]
   --version                            Show version information
   -?, -h, --help                       Show help and usage information
+
 
 ```
 
@@ -83,10 +85,6 @@ The tool will also generate a `server-package.json` file (not included in the pa
 |-------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `zipSHA256` | Sha256 of the vcc package, this is usually used by the vcc to verify the integrity of the downloaded vcc package, and should be provided for each package by package listings |
 
-## Contributors
-
-* [Cibbi](https://github.com/Cibbi)
-
 ## License
 
 VRC Packaging Tool is available as-is under MIT. For more information see [LICENSE](https://github.com/VRLabs/VRCTools-Packaging/blob/main/LICENSE).
@@ -102,5 +100,3 @@ VRC Packaging Tool is available as-is under MIT. For more information see [LICEN
 [<img src="https://github.com/VRLabs/Resources/raw/main/Icons/Twitter.png" width="50" height="50">](https://twitter.com/vrlabsdev "VRLabs")
 
 </div>
-
----
