@@ -67,7 +67,7 @@ public static class Packager
                 if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
                    Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
                 {
-                    Log.Information("::set-output name=vccPackagePath::{OutputFilePath}", outputFilePath);
+                    Console.WriteLine($"::set-output name=vcc_package_path::{outputFilePath}");
                 }
 
                 using var sha256 = SHA256.Create();
@@ -142,7 +142,7 @@ public static class Packager
             if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
                Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
             {
-                Log.Information("::set-output name=unityPackagePath::{OutputFilePath}", outputFilePath);
+                Console.WriteLine($"::set-output name=unity_package_path::{outputFilePath}");
             }
             DeleteDirectory(tempPath);
         }
@@ -157,7 +157,7 @@ public static class Packager
         if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
            Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
         {
-            Log.Information("::set-output name=serverPackageJsonPath::{OutputFilePath}", serverPackageJsonPath);
+            Console.WriteLine($"::set-output name=server_package_json_path::{serverPackageJsonPath}");
         }
         
         return true;
