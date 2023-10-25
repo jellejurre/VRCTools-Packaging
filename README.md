@@ -67,11 +67,11 @@ Options:
 
 The tool can use some additional fields in the `package.json` for the packaging process:
 
-| Field                                | Description                                                                                                                                                            |
-|--------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `icon`                               | Icon to use for the UnityPackage, no icons will be added if not there                                                                                                  |
-| `unityPackageDestinationFolder`      | Path where to place the assets inside the UnityPackage, this allows you to not need to store the entire path from Assets in the repository                             |
-| `unitypackageDestinationFolderMetas` | Dictionary of folders with their respective metas to be added when generating the UnityPackage, in the format of "Assets/path": "FolderGUID"                           |
+| Field                                | Description                                                                                                                                  |
+|--------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| `icon`                               | Url to the icon to use for the UnityPackage, no icons will be added if not there                                                             |
+| `unityPackageDestinationFolder`      | Path where to place the assets inside the UnityPackage, this allows you to not need to store the entire path from Assets in the repository   |
+| `unitypackageDestinationFolderMetas` | Dictionary of folders with their respective metas to be added when generating the UnityPackage, in the format of "Assets/path": "FolderGUID" |
 
 And it adds some additional fields to the `package.json`:
 

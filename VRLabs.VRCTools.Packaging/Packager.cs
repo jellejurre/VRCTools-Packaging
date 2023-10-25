@@ -119,13 +119,19 @@ public static class Packager
             IEnumerable<string> matchedAssets = assetMatcher.GetResultsInFullPath(tempPath);
             
             // Download the icon if it's a valid url and add it to the package
-            if (!string.IsNullOrEmpty(icon) && Uri.TryCreate(icon, UriKind.Absolute, out Uri _) && icon.EndsWith("png"))
+            if (!string.IsNullOrEmpty(icon) && Uri.TryCreate(icon, UriKind.Absolute, out Uri _))
             {
                 Log.Information("Downloading icon from {IconUrl}", icon);
                 using var client = new HttpClient();
                 HttpResponseMessage response = await client.GetAsync(icon);
                 response.EnsureSuccessStatusCode();
                 byte[] responseBody = await response.Content.ReadAsByteArrayAsync();
+                // check if the icon is a valid png by checking first 8 bytes
+                if (responseBody.Length < 8 || !responseBody.Take(8).SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }))
+                {
+                    Log.Warning("Icon at {IconUrl} is not a valid PNG package will be generated without an icon", icon);
+                }
+                
                 await File.WriteAllBytesAsync($"{tempPath}/.icon.png", responseBody);
                 Log.Information("Finished downloading icon at {IconPath}", $"{tempPath}/.icon.png");
                 await packer.AddAssetAsync($"{tempPath}/.icon.png");
