@@ -182,7 +182,7 @@ public static class Packager
         failures.IsFieldNullOrEmpty(package, "displayName", "package.json is missing displayName");
         failures.IsFieldNullOrEmpty(package, "description", "package.json is missing description");
         failures.IsFieldNullOrEmpty(package, "author", "package.json is missing author");
-        failures.IsFieldNullOrEmpty(package, "unity", "package.json is missing unity version");
+        //failures.IsFieldNullOrEmpty(package, "unity", "package.json is missing unity version");
         
         if (failures.Count > 0)
         {
