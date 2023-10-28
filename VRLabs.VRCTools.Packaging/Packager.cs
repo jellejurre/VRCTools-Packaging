@@ -17,7 +17,7 @@ public static class Packager
             Log.Information("Both skipVcc and skipUnityPackage are true, nothing to do");
             return true;
         }
-        var data = GetPackageJson(workingDirectory);
+        var data = GetPackageJson(workingDirectory, skipUnityPackage);
         if (data == null)
         {
             Log.Error("Could not find valid package.json in {WorkingDirectory}", workingDirectory);
@@ -80,7 +80,7 @@ public static class Packager
 
         if (!skipUnityPackage)
         {
-            string unityPackageDestinationFolder = data["unityPackageDestinationFolder"]?.ToString() ?? "Assets";
+            string unityPackageDestinationFolder = data["unityPackageDestinationFolder"]?.ToString() ?? $"Assets/{data["name"]}";
             
             if (!string.IsNullOrEmpty(unityPackageUrl))
                 data["unityPackageUrl"] = unityPackageUrl;
@@ -175,7 +175,7 @@ public static class Packager
         assetMatcher.AddExcludePatterns(new[] { "**/.*" });
     }
 
-    private static JsonObject? GetPackageJson(string workingDirectory)
+    private static JsonObject? GetPackageJson(string workingDirectory, bool skipUnityPackage)
     {
         string packagePath = workingDirectory + "/package.json";
         if (!File.Exists(packagePath)) return null;
@@ -189,6 +189,12 @@ public static class Packager
         failures.IsFieldNullOrEmpty(package, "description", "package.json is missing description");
         failures.IsFieldNullOrEmpty(package, "author", "package.json is missing author");
         //failures.IsFieldNullOrEmpty(package, "unity", "package.json is missing unity version");
+
+        if (!skipUnityPackage)
+        {
+            failures.IsFieldNullOrEmpty(package, "unityPackageDestinationFolder", "package.json is missing unityPackageDestinationFolder");
+            failures.IsFieldNullOrEmpty(package, "unityPackageDestinationFolderMetas", "package.json is missing unityPackageDestinationFolderMetas");
+        }
         
         if (failures.Count > 0)
         {

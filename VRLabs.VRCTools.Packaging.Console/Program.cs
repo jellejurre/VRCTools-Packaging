@@ -6,8 +6,8 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateLogger();
     
-var pathArg = new Argument<string>(name: "path", description: "Unity asset path");
-var outputArg = new Argument<string>(name: "output", description: "Output directory path for the packages");
+var pathArg = new Argument<string>(name: "path", description: "Package path");
+var outputArg = new Argument<string>(name: "output", description: "Output directory path");
 var releaseUrlOpt = new Option<string?>(name: "--releaseUrl", getDefaultValue: () => "", description: "Url of the release");
 var unityReleaseUrlOpt = new Option<string?>(name: "--unityReleaseUrl", getDefaultValue: () => "", description: "Url of the release of the unitypackage");
 var versionOpt = new Option<string?>(name: "--releaseVersion", getDefaultValue: () => "", description: "Version to use for the release, if not specified it will be taken from the package.json");
