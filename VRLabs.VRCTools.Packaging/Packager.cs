@@ -29,6 +29,8 @@ public static class Packager
         if(Directory.Exists(tempPath)) DeleteDirectory(tempPath);
         Directory.CreateDirectory(tempPath);
         
+        if(!Directory.Exists(outputDirectory)) DeleteDirectory(outputDirectory);
+        
         string? sha256String = null;
         data["zipSHA256"] = null;
 
