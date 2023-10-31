@@ -1,4 +1,5 @@
 ﻿using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -37,6 +38,7 @@ public static class Packager
             data["version"] = version;
         string packageVersion = data["version"]!.ToString();
         
+        StringBuilder githubOutput = new();
 
         if (!skipVcc)
         {
@@ -67,7 +69,8 @@ public static class Packager
                 if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
                    Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
                 {
-                    Console.WriteLine($"::set-output name=vccPackagePath::{outputFilePath}");
+                    githubOutput.AppendLine($"zipPath={outputFilePath}");
+                    //Console.WriteLine($"::set-output name=vccPackagePath::{outputFilePath}");
                 }
 
                 using var sha256 = SHA256.Create();
@@ -148,7 +151,8 @@ public static class Packager
             if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
                Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
             {
-                Console.WriteLine($"::set-output name=unityPackagePath::{outputFilePath}");
+                githubOutput.AppendLine($"unityPackagePath={outputFilePath}");
+                //Console.WriteLine($"::set-output name=unityPackagePath::{outputFilePath}");
             }
             DeleteDirectory(tempPath);
         }
@@ -163,7 +167,12 @@ public static class Packager
         if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
            Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
         {
-            Console.WriteLine($"::set-output name=serverPackageJsonPath::{serverPackageJsonPath}");
+            githubOutput.AppendLine($"serverPackageJsonPath={serverPackageJsonPath}");
+            //Console.WriteLine($"::set-output name=serverPackageJsonPath::{serverPackageJsonPath}");
+
+            var variables = Environment.GetEnvironmentVariable("GITHUB_OUTPUT");
+            githubOutput.Insert(0, variables + "\n");
+            Environment.SetEnvironmentVariable("GITHUB_OUTPUT", githubOutput.ToString());
         }
         
         return true;

@@ -10,5 +10,5 @@ FROM build AS publish
 RUN dotnet publish "VRLabs.VRCTools.Packaging.Console.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/runtime:7.0 AS final
-COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "VRLabs.VRCTools.Packaging.Console.dll"]
+COPY --from=publish /app/publish /app
+ENTRYPOINT ["dotnet", "/app/VRLabs.VRCTools.Packaging.Console.dll"]
