@@ -29,11 +29,19 @@ var command = new RootCommand("Packs the assets inside a folder in a Unity Proje
 
 command.SetHandler(async (source, output, releaseUrl, unityReleaseUrl, version, noVcc, noUnity, action) =>
 {
-    Environment.SetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS", action ? "true" : "false");
-    var result = await Packager.CreatePackage(source, output, releaseUrl, unityReleaseUrl, version, noVcc, noUnity);
-    if (!result)
+    try
     {
-        Log.Error("Failed to create package");
+        Environment.SetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS", action ? "true" : "false");
+        var result = await Packager.CreatePackage(source, output, releaseUrl, unityReleaseUrl, version, noVcc, noUnity);
+        if (!result)
+        {
+            Log.Error("Failed to create package");
+            Environment.Exit(1);
+        }
+    }
+    catch (Exception e)
+    {
+        Log.Error(e, "Failed to create package");
         Environment.Exit(1);
     }
     
