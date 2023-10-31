@@ -6,7 +6,13 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-        <Version>1.0.999</Version>
+        <Version>1.1.999</Version>
+        <IsPackable>false</IsPackable>
+        <Title>VRC Packaging Tool</Title>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <Company>VRLabs</Company>
+        <Authors>VRLabs</Authors>
+        <Description>Tool to package assets both in UnityPackage and VRChat's vcc format</Description>
     </PropertyGroup>
 
     <ItemGroup>

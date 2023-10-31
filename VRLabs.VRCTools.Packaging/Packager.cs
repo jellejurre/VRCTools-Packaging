@@ -1,27 +1,26 @@
-﻿using System.IO.Compression;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using ICSharpCode.SharpZipLib.Zip;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Serilog;
-using VRLabs.VRCTools.Packaging.JsonModels;
 
 namespace VRLabs.VRCTools.Packaging;
 
 public static class Packager
 {
-    public static async Task<bool> CreatePackage(string workingDirectory, string outputDirectory, string? releaseUrl = null, bool skipVcc = false, bool skipUnityPackage = false)
+    public static async Task<bool> CreatePackage(string workingDirectory, string outputDirectory, string? releaseUrl = null, string? unityPackageUrl = null, string? version = null, bool skipVcc = false, bool skipUnityPackage = false)
     {
-
         if (skipVcc && skipUnityPackage)
         {
             Log.Information("Both skipVcc and skipUnityPackage are true, nothing to do");
             return true;
         }
-        var data = GetPackageJson(workingDirectory);
+        var data = GetPackageJson(workingDirectory, skipUnityPackage);
         if (data == null)
         {
-            Log.Error("Could not find package.json in {WorkingDirectory}", workingDirectory);
+            Log.Error("Could not find valid package.json in {WorkingDirectory}", workingDirectory);
             return false;
         }
         string tempPath = Path.GetTempPath();
@@ -30,56 +29,77 @@ public static class Packager
         Directory.CreateDirectory(tempPath);
         
         string? sha256String = null;
-        data.ZipSHA256 = null;
+        data["zipSHA256"] = null;
+
+        string packageName = data["name"]!.ToString();
+        
+        if(!string.IsNullOrEmpty(version))
+            data["version"] = version;
+        string packageVersion = data["version"]!.ToString();
+        
 
         if (!skipVcc)
         {
-            if (releaseUrl is not null)
-                data.Url = releaseUrl;
-            else
-                data.Url = null;
+            if(!string.IsNullOrEmpty(releaseUrl))
+                data["url"] = releaseUrl;
+            
             CopyDirectory(workingDirectory, tempPath, true, true);
-            string outputFileName = $"{data.Name}-{data.Version}.zip";
+            string outputFileName = $"{packageName}-{packageVersion}.zip";
             string outputFilePath = $"{outputDirectory}/{outputFileName}";
 
             string jsonPath = tempPath + "/package.json";
             if (File.Exists(jsonPath))
             {
-                await File.WriteAllTextAsync(jsonPath, JsonSerializer.Serialize<VccPackageJson>(data, new JsonSerializerOptions{ DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }));
+                await File.WriteAllTextAsync(jsonPath, data.ToJsonString(new JsonSerializerOptions{ DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }));
                 Log.Information("Zipping {WorkingDirectory}", tempPath);
                 if(File.Exists(outputFilePath))
                     File.Delete(outputFilePath);
-                ZipFile.CreateFromDirectory(tempPath, outputFilePath);
+                
+                var assetMatcher = new Matcher();
+                AddExporterPatterns(assetMatcher);
+                
+                string[] matchedAssets = assetMatcher.GetResultsInFullPath(tempPath).ToArray();
+                
+                CreateZipFile(tempPath, outputFilePath, matchedAssets.ToList());
+                
+                //ZipFile.CreateFromDirectory(tempPath, outputFilePath);
                 Log.Information("Finished Zipping, available at {OutputFilePath}", outputFilePath);
                 if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
                    Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
                 {
-                    Log.Information("::set-output name=vccPackagePath::{OutputFilePath}", outputFilePath);
+                    Console.WriteLine($"::set-output name=vccPackagePath::{outputFilePath}");
                 }
 
                 using var sha256 = SHA256.Create();
-                await using (var stream = File.OpenRead(outputFilePath))
-                {
-                    var hash = sha256.ComputeHash(stream);
-                    sha256String = BitConverter.ToString(hash).Replace("-", "").ToLower();
-                }
+                await using var stream = File.OpenRead(outputFilePath);
+                byte[] hash = await sha256.ComputeHashAsync(stream);
+                sha256String = BitConverter.ToString(hash).Replace("-", "").ToLower();
             }
             DeleteDirectory(tempPath);
         }
 
         if (!skipUnityPackage)
         {
-            CreateExtraFolders(tempPath, data.UnitypackageDestinationFolderMetas);
+            string unityPackageDestinationFolder = data["unityPackageDestinationFolder"]?.ToString() ?? $"Assets/{data["name"]}";
+            
+            if (!string.IsNullOrEmpty(unityPackageUrl))
+                data["unityPackageUrl"] = unityPackageUrl;
 
-            CopyDirectory(workingDirectory, tempPath + "/" + data.UnityPackageDestinationFolder, true);
+            var folderMetas = data["unityPackageDestinationFolderMetas"].Deserialize<Dictionary<string, string>>();
+            
+            CreateExtraFolders(tempPath, folderMetas);
 
-            string outputFileName = $"{data.Name}-{data.Version}.unitypackage";
+            CopyDirectory(workingDirectory, tempPath + "/" + unityPackageDestinationFolder, true);
+            
+            string? icon = data["icon"]?.ToString();
+            
+            string outputFileName = $"{packageName}-{packageVersion}.unitypackage";
             string outputFilePath = $"{outputDirectory}/{outputFileName}";
         
-            string jsonPath = tempPath + "/" + data.UnityPackageDestinationFolder + "/package.json";
+            string jsonPath = tempPath + "/" + unityPackageDestinationFolder + "/package.json";
             if (File.Exists(jsonPath))
             {
-                await File.WriteAllTextAsync(jsonPath,JsonSerializer.Serialize<VccPackageJson>(data, new JsonSerializerOptions{ DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }));
+                await File.WriteAllTextAsync(jsonPath, data.ToJsonString(new JsonSerializerOptions{ DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }));
             }
             Log.Information("Packaging {WorkingDirectory}", tempPath);
             
@@ -93,11 +113,33 @@ public static class Packager
 
             // Match all the assets we need
             var assetMatcher = new Matcher();
-            assetMatcher.AddIncludePatterns(new[] { "**.*" });
-            assetMatcher.AddExcludePatterns(new[] { "Library/**.*", "**/.*" });
+            AddExporterPatterns(assetMatcher);
             assetMatcher.AddExclude(outputFileName);
 
             IEnumerable<string> matchedAssets = assetMatcher.GetResultsInFullPath(tempPath);
+            
+            // Download the icon if it's a valid url and add it to the package
+            if (!string.IsNullOrEmpty(icon) && Uri.TryCreate(icon, UriKind.Absolute, out Uri _))
+            {
+                Log.Information("Downloading icon from {IconUrl}", icon);
+                using var client = new HttpClient();
+                HttpResponseMessage response = await client.GetAsync(icon);
+                response.EnsureSuccessStatusCode();
+                byte[] responseBody = await response.Content.ReadAsByteArrayAsync();
+                // check if the icon is a valid png by checking first 8 bytes
+                if (responseBody.Length < 8 || !responseBody.Take(8).SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }))
+                {
+                    Log.Warning("Icon at {IconUrl} is not a valid PNG package will be generated without an icon", icon);
+                }
+                
+                await File.WriteAllBytesAsync($"{tempPath}/.icon.png", responseBody);
+                Log.Information("Finished downloading icon at {IconPath}", $"{tempPath}/.icon.png");
+                await packer.AddAssetAsync($"{tempPath}/.icon.png");
+            }
+            else
+            {
+                Log.Information("No icon found, skipping icon download");
+            }
             await packer.AddAssetsAsync(matchedAssets);
         
             // Finally flush and tell them we done
@@ -106,45 +148,68 @@ public static class Packager
             if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
                Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
             {
-                Log.Information("::set-output name=unityPackagePath::{OutputFilePath}", outputFilePath);
+                Console.WriteLine($"::set-output name=unityPackagePath::{outputFilePath}");
             }
             DeleteDirectory(tempPath);
         }
-        if(sha256String is not null)
-            data.ZipSHA256 = sha256String;
         
-        var serverPackageJsonPath = $"{workingDirectory}/server-package.json"; 
+        if(sha256String is not null)
+            data["zipSHA256"] = sha256String;
+        
+        var serverPackageJsonPath = $"{outputDirectory}/server-package.json"; 
         
         await File.WriteAllTextAsync(serverPackageJsonPath, JsonSerializer.Serialize(data));
         Log.Information("Finished creating server-package.json, available at {OutputFilePath}", serverPackageJsonPath);
         if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
            Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
         {
-            Log.Information("::set-output name=serverPackageJsonPath::{OutputFilePath}", serverPackageJsonPath);
+            Console.WriteLine($"::set-output name=serverPackageJsonPath::{serverPackageJsonPath}");
         }
         
         return true;
     }
-    
-    private static VrlPackageJson? GetPackageJson(string workingDirectory)
+
+    private static void AddExporterPatterns(Matcher assetMatcher)
+    {
+        assetMatcher.AddIncludePatterns(new[] { "**.*" });
+        assetMatcher.AddExcludePatterns(new[] { "**/.*" });
+    }
+
+    private static JsonObject? GetPackageJson(string workingDirectory, bool skipUnityPackage)
     {
         string packagePath = workingDirectory + "/package.json";
         if (!File.Exists(packagePath)) return null;
-        var package = JsonSerializer.Deserialize<VrlPackageJson>(File.ReadAllText(packagePath), new JsonSerializerOptions{PropertyNamingPolicy = JsonNamingPolicy.CamelCase});
-        var validationResult = new VrlPackageJsonValidator().Validate(package!);
+
+        var package = JsonNode.Parse(File.ReadAllText(packagePath))?.AsObject();// JsonSerializer.Deserialize<VrlPackageJson>(File.ReadAllText(packagePath), new JsonSerializerOptions{PropertyNamingPolicy = JsonNamingPolicy.CamelCase});
+        var failures = new List<string>();
         
-        if (!validationResult.IsValid)
+        failures.IsFieldNullOrEmpty(package, "name", "package.json is missing name");
+        failures.IsFieldNullOrEmpty(package, "version", "package.json is missing version");
+        failures.IsFieldNullOrEmpty(package, "displayName", "package.json is missing displayName");
+        failures.IsFieldNullOrEmpty(package, "description", "package.json is missing description");
+        failures.IsFieldNullOrEmpty(package, "author", "package.json is missing author");
+        //failures.IsFieldNullOrEmpty(package, "unity", "package.json is missing unity version");
+
+        if (!skipUnityPackage)
+        {
+            failures.IsFieldNullOrEmpty(package, "unityPackageDestinationFolder", "package.json is missing unityPackageDestinationFolder");
+            failures.IsFieldNullOrEmpty(package, "unityPackageDestinationFolderMetas", "package.json is missing unityPackageDestinationFolderMetas");
+        }
+        
+        if (failures.Count > 0)
         {
             Log.Error("package.json is invalid");
-            foreach (var error in validationResult.Errors)
+            foreach (var error in failures)
             {
-                Log.Error(" -{ValidationError}",error.ErrorMessage);
+                Log.Error(" -{ValidationError}",error);
             }
             return null;
         }
         
         return package;
     }
+    
+    
 
     private static void CreateExtraFolders(string path, Dictionary<string, string>? folders)
     {
@@ -188,8 +253,8 @@ public static class Packager
             CopyDirectory(subDir.FullName, newDestinationDir, true, ignoreDotPaths);
         }
     }
-    
-    public static void DeleteDirectory(string targetDir)
+
+    private static void DeleteDirectory(string targetDir)
     {
         File.SetAttributes(targetDir, FileAttributes.Normal);
 
@@ -208,5 +273,69 @@ public static class Packager
         }
         
         Directory.Delete(targetDir, false);
+    }
+
+    private static void CreateZipFile(string entryDirectoryPath, string outputPath, List<string> filePaths)
+    {
+        using var zipStream = new ZipOutputStream(File.Create(outputPath));
+        zipStream.SetLevel(9); // Set the compression level (0-9)
+
+        byte[] buffer = new byte[4096];
+
+        foreach (string filePath in filePaths)
+        {
+            var file = new FileInfo(filePath);
+            if (!file.Exists) continue;
+
+            string relativePath = Path.GetRelativePath(entryDirectoryPath, filePath);
+            
+            if (file.Extension == ".meta")
+            {
+                if (File.Exists(file.FullName[..^5]))
+                {
+                    Log.Information("Writing meta {Path}", relativePath);
+                    WriteFile(relativePath, filePath, zipStream, buffer);
+                    continue;
+                }
+                if(Directory.Exists(file.FullName[..^5]))
+                {
+                    Log.Information("Writing meta {Path}", relativePath);
+                    WriteFile(relativePath, filePath, zipStream, buffer);
+                    continue;
+                }
+                
+                Log.Warning("{Path} refers to a non existing file/folder, skipping", relativePath);
+                continue;
+            }
+            
+            string metaFile = $"{file.FullName}.meta";
+            if (!File.Exists(metaFile))
+            {
+                //Meta file is missing so we will skip it.
+                Log.Warning("Missing .meta for {Path}, skipping", relativePath);
+                continue;
+            }
+            
+            Log.Information("Writing File {Path}", relativePath);
+            WriteFile(relativePath, filePath, zipStream, buffer);
+        }
+
+        zipStream.Finish();
+        zipStream.Close();
+    }
+
+    private static void WriteFile(string relativePath, string filePath, ZipOutputStream zipStream, byte[] buffer)
+    {
+        var entry = new ZipEntry(relativePath);
+        entry.DateTime = DateTime.Now;
+        zipStream.PutNextEntry(entry);
+
+        using FileStream fileStream = File.OpenRead(filePath);
+        int bytesRead;
+        do
+        {
+            bytesRead = fileStream.Read(buffer, 0, buffer.Length);
+            zipStream.Write(buffer, 0, bytesRead);
+        } while (bytesRead > 0);
     }
 }

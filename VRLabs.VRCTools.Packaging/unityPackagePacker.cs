@@ -61,12 +61,18 @@ public class unityPackagePacker : IDisposable, IAsyncDisposable
         if (!_files.Add(file.FullName)) return false;
 
         string relativePath = Path.GetRelativePath(ProjectPath, file.FullName);
+        if(file.Name == ".icon.png")
+        {
+            Log.Information("Writing unityPackage Icon {Path}", relativePath);
+            await _tarStream.WriteFileAsync(file.FullName, ".icon.png");
+            return true;
+        }
+        
         string metaFile = $"{file.FullName}.meta";
-
         if (!File.Exists(metaFile))
         {
             //Meta file is missing so we will skip it.
-            Log.Warning("Missing .meta for {Path} , skipping", relativePath);
+            Log.Warning("Missing .meta for {Path}, skipping", relativePath);
             return false;
         }
 
