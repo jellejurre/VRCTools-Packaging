@@ -24,6 +24,7 @@ public static class Packager
             Log.Error("Could not find valid package.json in {WorkingDirectory}", workingDirectory);
             return false;
         }
+        
         string tempPath = Path.GetTempPath();
         tempPath += "/VRLabs/Packaging";
         if(Directory.Exists(tempPath)) DeleteDirectory(tempPath);
@@ -32,16 +33,18 @@ public static class Packager
         if(!Directory.Exists(outputDirectory)) Directory.CreateDirectory(outputDirectory);
         
         string? sha256String = null;
-        data["zipSHA256"] = null;
+        data.Remove("zipSHA256");
 
         string packageName = data["name"]!.ToString();
         
         if(!string.IsNullOrEmpty(version))
             data["version"] = version;
+        
         string packageVersion = data["version"]!.ToString();
         
         StringBuilder githubOutput = new();
 
+        // VCC Package Creation
         if (!skipVcc)
         {
             if(!string.IsNullOrEmpty(releaseUrl))
@@ -66,13 +69,11 @@ public static class Packager
                 
                 CreateZipFile(tempPath, outputFilePath, matchedAssets.ToList());
                 
-                //ZipFile.CreateFromDirectory(tempPath, outputFilePath);
                 Log.Information("Finished Zipping, available at {OutputFilePath}", outputFilePath);
                 if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
                    Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
                 {
-                    githubOutput.AppendLine($"zipPath={outputFilePath}");
-                    //Console.WriteLine($"::set-output name=vccPackagePath::{outputFilePath}");
+                    githubOutput.AppendLine($"vccPackagePath={outputFilePath}");
                 }
 
                 using var sha256 = SHA256.Create();
@@ -83,6 +84,7 @@ public static class Packager
             DeleteDirectory(tempPath);
         }
 
+        // Unity Package Creation
         if (!skipUnityPackage)
         {
             string unityPackageDestinationFolder = data["unityPackageDestinationFolder"]?.ToString() ?? $"Assets/{data["name"]}";
@@ -91,12 +93,9 @@ public static class Packager
                 data["unityPackageUrl"] = unityPackageUrl;
 
             var folderMetas = data["unityPackageDestinationFolderMetas"].Deserialize<Dictionary<string, string>>();
-            
             CreateExtraFolders(tempPath, folderMetas);
 
             CopyDirectory(workingDirectory, tempPath + "/" + unityPackageDestinationFolder, true);
-            
-            string? icon = data["icon"]?.ToString();
             
             string outputFileName = $"{packageName}-{packageVersion}.unitypackage";
             string outputFilePath = $"{outputDirectory}/{outputFileName}";
@@ -124,6 +123,7 @@ public static class Packager
             IEnumerable<string> matchedAssets = assetMatcher.GetResultsInFullPath(tempPath);
             
             // Download the icon if it's a valid url and add it to the package
+            string? icon = data["icon"]?.ToString();
             if (!string.IsNullOrEmpty(icon) && Uri.TryCreate(icon, UriKind.Absolute, out Uri _))
             {
                 Log.Information("Downloading icon from {IconUrl}", icon);
@@ -145,16 +145,15 @@ public static class Packager
             {
                 Log.Information("No icon found, skipping icon download");
             }
+            
             await packer.AddAssetsAsync(matchedAssets);
-        
-            // Finally flush and tell them we done
             await packer.FlushAsync();
+            
             Log.Information("Finished Packaging, available at {OutputFilePath}", outputFilePath);
             if(Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS") is not null &&
                Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
             {
                 githubOutput.AppendLine($"unityPackagePath={outputFilePath}");
-                //Console.WriteLine($"::set-output name=unityPackagePath::{outputFilePath}");
             }
             DeleteDirectory(tempPath);
         }
@@ -170,11 +169,9 @@ public static class Packager
            Environment.GetEnvironmentVariable("RUNNING_ON_GITHUB_ACTIONS")!.Equals("true"))
         {
             githubOutput.AppendLine($"serverPackageJsonPath={serverPackageJsonPath}");
-            //Console.WriteLine($"::set-output name=serverPackageJsonPath::{serverPackageJsonPath}");
 
-            var variables = Environment.GetEnvironmentVariable("GITHUB_OUTPUT");
-            githubOutput.Insert(0, variables + "\n");
-            Environment.SetEnvironmentVariable("GITHUB_OUTPUT", githubOutput.ToString());
+            string variables = Environment.GetEnvironmentVariable("GITHUB_OUTPUT")!;
+            await File.AppendAllTextAsync(variables, githubOutput.ToString());
         }
         
         return true;
