@@ -34,6 +34,12 @@ Only generating the `vcc` package:
 VRCPackagingTool.exe "packageAssetsPath" "outputDirectorypath" --releaseUrl "vccReleaseUrl" --nounity  
 ```
 
+With custom json fields in the `package.json`,useful for custom vcc clients that may use additional fields (for example [ALCOM's](https://vrc-get.anatawa12.com/alcom/) custom changelog url field):
+
+```
+VRCPackagingTool.exe "packageAssetsPath" "outputDirectorypath" --releaseUrl "vccReleaseUrl" --unityReleaseUrl "unityReleaseUrl" --customJsonFields "changelogUrl=https://link.to.changelog" "anotherField=anotherValue"
+```
+
 You can use the `--help` or `-h` flag to get a list of all the available options.
 
 ```
