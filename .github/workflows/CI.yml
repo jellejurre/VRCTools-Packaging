@@ -15,10 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup .NET Core
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.x.x'
 
@@ -46,7 +46,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set version from branch name
         id: set_version
@@ -63,7 +63,7 @@ jobs:
           echo "image_name=$lowercase" >> $GITHUB_OUTPUT
 
       - name: Setup .NET Core
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.x.x'
 
@@ -89,7 +89,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set version from branch name
         id: set_version
@@ -110,7 +110,7 @@ jobs:
           sed -i "s/<Version>.*<\/Version>/<Version>${{ steps.set_version.outputs.version }}<\/Version>/" VRLabs.VRCTools.Packaging.Console/VRLabs.VRCTools.Packaging.Console.csproj
 
       - name: Log in to the Container registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -119,7 +119,7 @@ jobs:
       # It uses the `context` parameter to define the build's context as the set of files located in the specified path. For more information, see "[Usage](https://github.com/docker/build-push-action#usage)" in the README of the `docker/build-push-action` repository.
       # It uses the `tags` and `labels` parameters to tag and label the image with the output from the "meta" step.
       - name: Build and push Docker image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./VRLabs.VRCTools.Packaging.Console/Dockerfile
@@ -129,3 +129,49 @@ jobs:
             ${{ env.REGISTRY }}/${{ steps.set_version.outputs.image_name }}:${{ steps.set_version.outputs.major_version }}.${{ steps.set_version.outputs.minor_version }}
             ${{ env.REGISTRY }}/${{ steps.set_version.outputs.image_name }}:${{ steps.set_version.outputs.major_version }}
             ${{ env.REGISTRY }}/${{ steps.set_version.outputs.image_name }}:latest
+
+  release:
+    needs: [matrix-build, docker-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set version from branch name
+        id: set_version
+        run: |
+          version=$(echo "${{ github.ref_name }}")
+          version=$(echo $version | tr '[:upper:]' '[:lower:]')
+          echo "version=$version" >> $GITHUB_OUTPUT
+          major_version=$(echo $version | cut -d '.' -f 1)
+          minor_version=$(echo $version | cut -d '.' -f 2)
+          echo "major_version=$major_version" >> $GITHUB_OUTPUT
+          echo "minor_version=$minor_version" >> $GITHUB_OUTPUT
+          lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "image_name=$lowercase" >> $GITHUB_OUTPUT
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: bin/Release/publish
+
+      - name: Zip each artifact
+        run: |
+          cd bin/Release/publish/VRCPackagingTool-linux-x64
+          zip -r ../VRCPackagingTool-linux-x64.zip .
+          cd ../VRCPackagingTool-win-x64
+          zip -r ../VRCPackagingTool-win-x64.zip .
+          cd ../VRCPackagingTool-osx-x64
+          zip -r ../VRCPackagingTool-osx-x64.zip .
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_TAG: ${{ steps.set_version.outputs.version }}
+        with:
+          name: Release ${{ steps.set_version.outputs.version }}
+          files: |
+            bin/Release/publish/VRCPackagingTool-linux-x64.zip
+            bin/Release/publish/VRCPackagingTool-win-x64.zip
+            bin/Release/publish/VRCPackagingTool-osx-x64.zip
